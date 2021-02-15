@@ -4,8 +4,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: pha-backend.py
 #------------------------------------------------------------------------------
-# Version 0.1
-# 11 February, 2021
+# Version 0.3
+# 15 February, 2021
 # Michael Taylor
 # https://patternizer.github.io
 # patternizer AT gmail DOT com
@@ -21,6 +21,9 @@ import pickle
 from datetime import datetime
 #import nc_time_axis
 #import cftime
+import scipy
+import scipy.stats as stats    
+from sklearn.preprocessing import StandardScaler
 # Plotting libraries:
 import matplotlib
 import matplotlib.pyplot as plt; plt.close('all')
@@ -34,7 +37,7 @@ import matplotlib.dates as mdates
 import matplotlib.colors as mcolors
 import matplotlib.ticker as mticker
 # OS libraries:
-import os
+import os, glob
 import os.path
 from pathlib import Path
 import sys
@@ -55,294 +58,320 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 #------------------------------------------------------------------------------
 
 fontsize = 20
+nheader = 0
+pha_startyear = 1895
+pha_endyear = 2015
+flag_absolute = False
+
+dir_cwd = '/home/patternizer/Documents/REPOS/pha-backend/'
+dir_raw = 'ICELAND/data/benchmark/world1/monthly/raw/'
+#dir_pha = 'ICELAND/data/benchmark/world1/monthly/FLs.r00/'
+dir_pha = 'ICELAND/data/benchmark/world1/monthly/WMs.r00/'
+dir_stnlist = 'ICELAND/data/benchmark/world1/meta/world1_stnlist.tavg'
+raw_files = sorted(glob.glob(dir_cwd+dir_raw+'*.raw.tavg'))
+#pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.FLs.r00.tavg'))
+pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.WMs.r00.tavg'))
+stnlist = glob.glob(dir_cwd+dir_stnlist)[0]
 
 #------------------------------------------------------------------------------
-# LOAD: Iceland station absolute temperatures (Tx10)
+# LOAD: stnlist
 #------------------------------------------------------------------------------
 
-nheader = 0
-stationcode = 'PW100482715'
-f = open(stationcode+'.raw.tavg')
-#f = open(stationcode+'.FLs.r00.tavg')
-#f = open(stationcode+'.WMs.r00.tavg')
-lines = f.readlines()
-dates = []
-obs = []
-for i in range(nheader,len(lines)):
-    words = lines[i].split()    
-    date = int(words[1])
-    val = (len(words)-2)*[None]
-    for j in range(len(val)):                            
-        try: val[j] = int(words[j+2])
-        except:                    
-            pass
-    dates.append(date)        
-    obs.append(val) 
-f.close()    
-dates = np.array(dates)
-obs = np.array(obs)
-
-df = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
-# df['mean'] = da[da.columns[range(1,13)]].mean(axis=1)
-
-df['stationcode'] = len(dates)*[stationcode]
-df['year'] = dates
-for j in range(12):        
-    df[df.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
-
-# Replace monthly fill value -999 with np.nan    
-for j in range(12):        
-    df[df.columns[j+2]].replace(-9999, np.nan, inplace=True)
-    
-# Apply /100 scale factor    
-for j in range(12):       
-    df[df.columns[j+2]] = df[df.columns[j+2]]/100.0
-
-df_ts_monthly = np.array(df.groupby('year').mean().iloc[:,1:]).ravel() 
-df_t_monthly = pd.date_range(start=str(df['year'].iloc[0]), periods=len(df_ts_monthly), freq='M')   
-
-# --------------
-
-
-nheader = 0
-stationcode = 'PW100482715'
-f = open(stationcode+'.FLs.r00.tavg')
-lines = f.readlines()
-dates = []
-obs = []
-for i in range(nheader,len(lines)):
-    words = lines[i].split()    
-    date = int(words[0][-4:])
-    val = (len(words)-1)*[None]
-    for j in range(len(val)):                            
-        try: val[j] = int(words[j+1].rstrip('E'))
-        except:                    
-            pass
-    dates.append(date)        
-    obs.append(val) 
-f.close()    
-dates = np.array(dates)
-obs = np.array(obs)
-
-df_FL = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
-# df['mean'] = da[da.columns[range(1,13)]].mean(axis=1)
-
-df_FL['stationcode'] = len(dates)*[stationcode]
-df_FL['year'] = dates
-for j in range(12):        
-    df_FL[df_FL.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
-
-# Replace monthly fill value -999 with np.nan    
-for j in range(12):        
-    df_FL[df_FL.columns[j+2]].replace(-9999, np.nan, inplace=True)
-    
-# Apply /100 scale factor    
-for j in range(12):       
-    df_FL[df_FL.columns[j+2]] = df_FL[df_FL.columns[j+2]]/100.0
-
-df_FL_ts_monthly = np.array(df_FL.groupby('year').mean().iloc[:,1:]).ravel() 
-df_FL_t_monthly = pd.date_range(start=str(df_FL['year'].iloc[0]), periods=len(df_FL_ts_monthly), freq='M')   
-
-# --------------
-
-
-nheader = 0
-stationcode = 'PW100482715'
-f = open(stationcode+'.WMs.r00.tavg')
-lines = f.readlines()
-dates = []
-obs = []
-for i in range(nheader,len(lines)):
-    words = lines[i].split()    
-    date = int(words[0][-4:])
-    val = (len(words)-1)*[None]
-    for j in range(len(val)):                            
-        try: val[j] = int(words[j+1].rstrip('E'))
-        except:                    
-            pass
-    dates.append(date)        
-    obs.append(val) 
-f.close()    
-dates = np.array(dates)
-obs = np.array(obs)
-
-df_WM = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
-# df['mean'] = da[da.columns[range(1,13)]].mean(axis=1)
-
-df_WM['stationcode'] = len(dates)*[stationcode]
-df_WM['year'] = dates
-for j in range(12):        
-    df_WM[df_WM.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
-
-# Replace monthly fill value -999 with np.nan    
-for j in range(12):        
-    df_WM[df_WM.columns[j+2]].replace(-9999, np.nan, inplace=True)
-    
-# Apply /100 scale factor    
-for j in range(12):       
-    df_WM[df_WM.columns[j+2]] = df_WM[df_WM.columns[j+2]]/100.0
-
-df_WM_ts_monthly = np.array(df_WM.groupby('year').mean().iloc[:,1:]).ravel() 
-df_WM_t_monthly = pd.date_range(start=str(df_WM['year'].iloc[0]), periods=len(df_WM_ts_monthly), freq='M')   
-
-
-
-diff_FL = df_ts_monthly - df_FL_ts_monthly
-diff_WM = df_ts_monthly - df_WM_ts_monthly
-
-
-#------------------------------------------------------------------------------
-# LOAD: normals5
-#------------------------------------------------------------------------------
-
-# normals = pd.read_pickle('df_normals.pkl', compression='bz2')
-
-nheader = 0
-f = open('normals5.GloSAT.prelim03_FRYuse_ocPLAUS1_iqr3.600reg0.3_19411990_MIN15_OCany_19611990_MIN15_PERDEC00_NManySDreq.txt')
+f = open(stnlist)
 lines = f.readlines()
 stationcodes = []
-sourcecodes = []
-obs = []
 for i in range(nheader,len(lines)):
     words = lines[i].split()    
-    stationcode = words[0][0:6]
-    sourcecode = int(words[17])
-    val = (12)*[None]
-    for j in range(12):                         
-        try: val[j] = float(words[j+5])
-        except:                                    
-            pass
-    stationcodes.append(stationcode)
-    sourcecodes.append(sourcecode)
-    obs.append(val)     
+    stationcode = words[0]
+    stationcodes.append(stationcode)        
 f.close()    
-obs = np.array(obs)
 
-dn = pd.DataFrame(columns=['stationcode','sourcecode','1','2','3','4','5','6','7','8','9','10','11','12'])
+n = len(stationcodes)
 
-dn['stationcode'] = stationcodes
-dn['sourcecode'] = sourcecodes
-for j in range(12):        
-    dn[dn.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
+#------------------------------------------------------------------------------
+# LOAD: PHA station adjusted absolute temperatures (Tx100) in GHCNm-v3 format
+#------------------------------------------------------------------------------
 
-# Replace monthly fill value -999 with np.nan    
-for j in range(12):        
-    dn[dn.columns[j+2]].replace(-999., np.nan, inplace=True)
+df_pha = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
 
-# Filter out stations with missing normals
+for k in range(n):
 
-df_normals = df[df['stationcode'].isin(dn[dn['sourcecode']>1]['stationcode'])].reset_index()
-dn_normals = dn[dn['stationcode'].isin(df_normals['stationcode'])].reset_index()
+    f = open(pha_files[k])
+    lines = f.readlines()
+    dates = []
+    obs = []
+    for i in range(nheader,len(lines)):
+        words = lines[i].split()    
+        date = int(words[0][-4:])
+        val = (12)*[None]
+        for j in range(len(val)):                            
+            try: val[j] = int(words[j+1].rstrip('E'))
+            except:                    
+                pass
+        dates.append(date)        
+        obs.append(val) 
+    f.close()    
+    dates = np.array(dates)
+    obs = np.array(obs)
 
-df_anom = df_normals.copy()
-for i in range(len(df_normals)):
-    normals = dn_normals[dn_normals['stationcode']==df_normals['stationcode'][i]]
-    for j in range(1,13):            
-        df_anom[str(j)][i] = df_normals[str(j)][i] - normals[str(j)]
-df = df_anom.copy()
+    # Create station dataframe
 
-# Monthly mean
+    df = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
+    df['year'] = dates
+    df['stationcode'] = len(dates)*[stationcodes[k][-6:]]
+    for j in range(12):        
+        df[df.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
 
-t = pd.date_range(start=str(df['year'].min()), end=str(df['year'].max()+1), freq='M')   
-dg = pd.DataFrame(columns=df['stationcode'].unique(),index=t)   
+    # Replace monthly fill value -9999 with np.nan    
 
-n = len(df['stationcode'].unique())
+    for j in range(12):        
+        df[df.columns[j+2]].replace(-9999, np.nan, inplace=True)
+
+    # Apply /100 scale factor    
+
+    for j in range(12):       
+        df[df.columns[j+2]] = df[df.columns[j+2]]/100.0
+
+    # Calculate station normals
+
+    normals = df[(df['year']>1960) & (df['year']<1991)].mean()[2:]
+    if flag_absolute == True:
+       normals = np.zeros(12)
+    
+    # Calculate station anomalies
+
+    for j in range(12):       
+        df[df.columns[j+2]] = df[df.columns[j+2]] - normals[j]
+
+    # Append station anomalies dataframe
+
+    df_pha = df_pha.copy().append([df],ignore_index=True)
+
+# Map onto 1895-2015 and calculate monthly mean
+
+t = pd.date_range(start=str(pha_startyear), end=str(pha_endyear+1), freq='M')   
+dg_pha = pd.DataFrame(columns=df_pha['stationcode'].unique(),index=t)   
+
 for i in range(n):
-    da = df[df['stationcode']==df['stationcode'].unique()[i]]
-    ts_monthly = np.array(da.groupby('year').mean().iloc[:,1:]).ravel() 
-    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')   
-    db = pd.DataFrame({dg.columns[i]:ts_monthly},index=t_monthly)
-    dg[dg.columns[i]] = db
 
-dg['mean'] = dg.mean(axis=1)
+    da = df_pha[df_pha['stationcode']==df_pha['stationcode'].unique()[i]]
+    nyears = da.max()['year']-da.min()['year']+1
+    startyear = da.min()['year']
+    if nyears == len(da):
+        ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
+        t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')   
+    else:        
+        ts_monthly = (nyears*12)*[np.nan]
+        for j in range(len(da)):                
+            ts_monthly[(da['year'].iloc[j]-startyear)*12:(da['year'].iloc[j]-startyear+1)*12-1] = np.array(da.groupby('year').mean().iloc[j,0:])
+        t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')   
+    db = pd.DataFrame({dg_pha.columns[i]:ts_monthly},index=t_monthly)
+    dg_pha[dg_pha.columns[i]] = db
+
+dg_pha['mean'] = dg_pha.mean(axis=1)
 
 #------------------------------------------------------------------------------
-# PLOT: ALL STATION TIMESERIES
+# LOAD: raw station absolute temperatures (Tx100) in GHCNm-v3 format
 #------------------------------------------------------------------------------
 
-figstr = 'iceland-timeseries-anomalies-yearly-mean.png'
-titlestr = 'Iceland21.postmerge (normals)'
-             
-n = len(df['stationcode'].unique())
-colors = cmocean.cm.thermal(np.linspace(0.05,0.95,n)) 
-hexcolors = [ "#{:02x}{:02x}{:02x}".format(int(colors[i][0]*255),int(colors[i][1]*255),int(colors[i][2]*255)) for i in range(len(colors)) ]
+df_raw = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
 
+for k in range(n):
+
+    f = open(raw_files[k])
+    lines = f.readlines()
+    dates = []
+    obs = []
+    for i in range(nheader,len(lines)):
+        words = lines[i].split()    
+        date = int(words[1])
+        val = (12)*[None]
+        for j in range(len(val)):                            
+            try: val[j] = int(words[j+2])
+            except:                    
+                pass
+        dates.append(date)        
+        obs.append(val) 
+    f.close()    
+    dates = np.array(dates)
+    obs = np.array(obs)
+
+    # Create station dataframe
+
+    df = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
+    df['year'] = dates
+    df['stationcode'] = len(dates)*[stationcodes[k][-6:]]
+    for j in range(12):        
+        df[df.columns[j+2]] = [ obs[i][j] for i in range(len(obs)) ]
+
+    # Replace monthly fill value -9999 with np.nan    
+
+    for j in range(12):        
+        df[df.columns[j+2]].replace(-9999, np.nan, inplace=True)
+
+    # Apply /100 scale factor    
+
+    for j in range(12):       
+        df[df.columns[j+2]] = df[df.columns[j+2]]/100.0
+
+    # Calculate station normals
+
+    normals = df[(df['year']>1960) & (df['year']<1991)].mean()[2:]
+    if flag_absolute == True:
+       normals = np.zeros(12)
+    
+    # Calculate station anomalies
+
+    for j in range(12):       
+        df[df.columns[j+2]] = df[df.columns[j+2]] - normals[j]
+
+    # Trim to df_pha station tmin and tmax
+
+    tmin = df_pha[df_pha['stationcode']==df['stationcode'].unique()[0]].min()['year']
+    tmax = df_pha[df_pha['stationcode']==df['stationcode'].unique()[0]].max()['year']
+    dg = df[(df['year']>=tmin)&(df['year']<=tmax)]
+
+    # Append station anomalies dataframe
+
+    df_raw = df_raw.copy().append([dg],ignore_index=True)
+
+# Map onto 1895-2015 and calculate monthly mean
+
+t = pd.date_range(start=str(pha_startyear), end=str(pha_endyear+1), freq='M')
+dg_raw = pd.DataFrame(columns=df_raw['stationcode'].unique(),index=t)   
+
+for i in range(n):
+
+    da = df_raw[df_raw['stationcode']==df_raw['stationcode'].unique()[i]]
+    nyears = da.max()['year']-da.min()['year']+1
+    startyear = da.min()['year']
+    if nyears == len(da):
+        ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
+        t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')   
+    else:        
+        ts_monthly = (nyears*12)*[np.nan]
+        for j in range(len(da)):                
+            ts_monthly[(da['year'].iloc[j]-startyear)*12:(da['year'].iloc[j]-startyear+1)*12-1] = np.array(da.groupby('year').mean().iloc[j,0:])
+        t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')   
+    db = pd.DataFrame({dg_raw.columns[i]:ts_monthly},index=t_monthly)
+    dg_raw[dg_raw.columns[i]] = db
+
+dg_raw['mean'] = dg_raw.mean(axis=1)
+
+#------------------------------------------------------------------------------
+# PLOT: raw v adjusted
+#------------------------------------------------------------------------------
+
+for i in range(n):
+
+    t_monthly = dg_raw.index
+    raw_ts_monthly = dg_raw.iloc[:,i]
+    pha_ts_monthly = dg_pha.iloc[:,i]
+
+    figstr = stationcodes[i] + '-raw-v-pha.png'
+    titlestr = stationcodes[i]
+                 
+    fig, ax = plt.subplots(figsize=(15,10))          
+    plt.scatter(t_monthly, raw_ts_monthly, marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
+    plt.scatter(t_monthly, pha_ts_monthly, marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
+    plt.vlines(t_monthly, raw_ts_monthly, pha_ts_monthly, colors='lightgrey', zorder=0)
+    ax.xaxis.grid(True, which='major')      
+    ax.yaxis.grid(True, which='major')  
+    plt.tick_params(labelsize=16)    
+    plt.legend(loc='upper left', fontsize=12)
+    plt.xlabel('Year', fontsize=fontsize)
+    if flag_absolute == True:
+        plt.ylabel(r'Absolute temperature [°C]', fontsize=fontsize)
+    else:
+        plt.ylabel(r'Temperature anomaly (from 1961-1990) [°C]', fontsize=fontsize)
+    plt.title(titlestr, fontsize=fontsize)
+    plt.savefig(figstr)
+    plt.close(fig)
+
+#------------------------------------------------------------------------------
+# PLOT: raw (mean) v adjusted (mean)
+#------------------------------------------------------------------------------
+
+figstr = 'raw-v-pha-means.png'
+titlestr = 'Monthly means: raw versus PHA-adjusted'
+                 
 fig, ax = plt.subplots(figsize=(15,10))          
-
-for i in range(n):
-    da = df[df['stationcode']==df['stationcode'].unique()[i]]
-    ts_monthly = np.array(da.groupby('year').mean().iloc[:,1:]).ravel() 
-    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')           
-#   plt.scatter(t_monthly, ts_monthly, marker='s', lw=0.2, color=hexcolors[i], alpha=0.8, label=df['stationcode'].unique()[i])
-    plt.plot(t_monthly, ts_monthly, lw=0.8, color=hexcolors[i], alpha=0.8, label=df['stationcode'].unique()[i])
-plt.plot(dg['mean'].dropna().rolling(12).mean(), marker='.', ls='None', color='black', alpha=1.0, label='Annual mean')
+plt.scatter(t_monthly, dg_raw['mean'], marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
+plt.scatter(t_monthly, dg_pha['mean'], marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
+plt.vlines(t_monthly, dg_raw['mean'], dg_pha['mean'], colors='lightgrey', zorder=0)
 ax.xaxis.grid(True, which='major')      
 ax.yaxis.grid(True, which='major')  
 plt.tick_params(labelsize=16)    
-plt.legend(loc='upper left', bbox_to_anchor=(1.04,1), ncol=3, fontsize=8)
+plt.legend(loc='upper left', fontsize=12)
 plt.xlabel('Year', fontsize=fontsize)
-plt.ylabel(r'Temperature anomaly (from 1961-1990) [K]', fontsize=fontsize)
+if flag_absolute == True:
+    plt.ylabel(r'Absolute temperature [°C]', fontsize=fontsize)
+else:
+    plt.ylabel(r'Temperature anomaly (from 1961-1990) [°C]', fontsize=fontsize)
 plt.title(titlestr, fontsize=fontsize)
-plt.subplots_adjust(right=0.7)
 plt.savefig(figstr)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# CALL RBEAST FOR EACH STATION
+# PLOT: raw (mean) - adjusted (mean)
 #------------------------------------------------------------------------------
 
+figstr = 'raw-v-pha-means-diff.png'
+titlestr = 'Monthly mean adjustments (raw-PHA)'
+                 
+fig, ax = plt.subplots(figsize=(15,10))          
+plt.step(x=t_monthly, y=dg_raw['mean']-dg_pha['mean'], marker='.', color='black', lw=0.5, alpha=1.0, zorder=0)
+ax.xaxis.grid(True, which='major')      
+ax.yaxis.grid(True, which='major')  
+plt.tick_params(labelsize=16)    
+plt.xlabel('Year', fontsize=fontsize)
+if flag_absolute == True:
+    plt.ylabel(r'Change in absolute temperature [°C]', fontsize=fontsize)
+else:
+    plt.ylabel(r'Change in temperature anomaly (from 1961-1990) [°C]', fontsize=fontsize)
+plt.title(titlestr, fontsize=fontsize)
+plt.savefig(figstr)
+plt.close(fig)
+
+#------------------------------------------------------------------------------
+# PLOT: histogram of adjustments
+#------------------------------------------------------------------------------
+
+adj_all = []
 for i in range(n):
+    raw_ts_monthly = dg_raw.iloc[:,i].ravel()
+    pha_ts_monthly = dg_pha.iloc[:,i].ravel()
+    adj_ts_monthly = raw_ts_monthly-pha_ts_monthly
+    adj_all.append(adj_ts_monthly)    
+adj_all = np.array(adj_all).flatten()
+mask = (np.isfinite(adj_all)) & (np.abs(adj_all)>0.001)
+adjustments = adj_all[mask]
 
-    da = df[df['stationcode']==df['stationcode'].unique()[i]]
-    ts_monthly = np.array(da.groupby('year').mean().iloc[:,1:]).ravel() 
-    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')           
-    dg = pd.DataFrame({'t':t_monthly,'ts':ts_monthly})
-    dg = dg.replace(r'^\s+$', np.nan, regex=True)
-    dg.to_csv('dg.csv', index=False)
-    code = df['stationcode'].unique()[i]
-
-    command = '/usr/bin/Rscript'
-#   path2rscript = '~/Desktop/Rbeast/rbeast_frontend.R'
-    path2rscript = 'rbeast_frontend.R'
-    args = [code]
-    cmd = [command, path2rscript] + args
-    x = subprocess.call(cmd, universal_newlines=True)
-    # x = subprocess.check_output(cmd, universal_newlines=True)
-    # subprocess.call ("Rscript --vanilla path2rscript.R")
-    out_seasonal = pd.read_csv('out_seasonal.csv')
-    out_seasonal_prob = pd.read_csv('out_seasonal_prob.csv')
-    out_trend = pd.read_csv('out_trend.csv')
-    out_trend_prob = pd.read_csv('out_trend_prob.csv')
-
-    titlestr = 'Rbeast: ' + df['stationcode'].unique()[i]
-    figstr = "rbeast-iceland-fit-" + df['stationcode'].unique()[i] + '.png'
-
-    fig, axes = plt.subplots(5,1,sharex=True, figsize=(15,10))      
-    axes[0].set_title(titlestr, fontsize=fontsize)
-    axes[0].plot(t_monthly, ts_monthly, lw=0.8, color=hexcolors[i], alpha=1.0, label='timeseries')
-    axes[0].xaxis.grid(True, which='major')      
-    axes[0].yaxis.grid(True, which='major')  
-    axes[0].legend(loc='upper left', fontsize=8)
-    axes[1].plot(t_monthly, out_trend, lw=0.8, color='blue', alpha=1.0, label='trend')
-    axes[1].xaxis.grid(True, which='major')      
-    axes[1].yaxis.grid(True, which='major')  
-    axes[1].legend(loc='upper left', fontsize=8)
-    axes[2].plot(t_monthly, out_trend_prob, lw=0.8, color='grey', alpha=1.0, label='P(trend)')
-    axes[2].xaxis.grid(True, which='major')      
-    axes[2].yaxis.grid(True, which='major')  
-    axes[2].legend(loc='upper left', fontsize=8)
-    axes[3].plot(t_monthly, out_seasonal, lw=0.8, color='teal', alpha=1.0, label='seasonal')
-    axes[3].xaxis.grid(True, which='major')      
-    axes[3].yaxis.grid(True, which='major')  
-    axes[3].legend(loc='upper left', fontsize=8)
-    axes[4].plot(t_monthly, out_seasonal_prob, lw=0.8, color='grey', alpha=1.0, label='P(seasonal)')
-    axes[4].xaxis.grid(True, which='major')      
-    axes[4].yaxis.grid(True, which='major')  
-    axes[4].legend(loc='upper left', fontsize=8)
-    axes[4].set_xlabel('Year', fontsize=fontsize)
-#    axes[4].tick_params(labelsize=16)    
-    plt.savefig(figstr)
-    plt.close(fig)
+bins = 41
+xmin = -1.0; xmax = 1.0
+figstr = 'adjustment-histogram.png'
+titlestr = 'Histogram of all monthly adjustments (raw-PHA)'
+                 
+fig, ax = plt.subplots(figsize=(15,10))     
+kde = stats.gaussian_kde(adjustments); x = np.linspace(xmin,xmax,1000)
+plt.hist(adjustments, density=False, bins=bins, alpha=1.0, color='lightgrey')
+ax1 = plt.gca()
+ax2 = ax.twinx()
+ax2.plot(x, kde(x), color='red', lw=3)
+if flag_absolute == True:
+    ax1.set_xlabel(r'Absolute temperature adjustment [°C]', fontsize=fontsize)
+else:
+    ax1.set_xlabel(r'Temperature anomaly (from 1961-1990) adjustment [°C]', fontsize=fontsize)
+ax1.set_ylabel('Count', fontsize=fontsize)
+ax1.set_xlim(xmin,xmax)
+ax1.xaxis.grid(True, which='major')      
+ax1.tick_params(labelsize=16)    
+ax2.set_ylabel('KDE', fontsize=fontsize, color='red')
+ax2.tick_params(labelsize=16, colors='red')    
+ax2.spines['right'].set_color('red')
+plt.title(titlestr, fontsize=fontsize)
+plt.savefig(figstr)
+plt.close(fig)
 
 #------------------------------------------------------------------------------
 print('** END')
