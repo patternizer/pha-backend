@@ -61,7 +61,7 @@ fontsize = 20
 nheader = 0
 pha_startyear = 1895
 pha_endyear = 2015
-flag_absolute = False
+flag_absolute = True
 
 dir_cwd = '/home/patternizer/Documents/REPOS/pha-backend/'
 dir_raw = 'ICELAND/data/benchmark/world1/monthly/raw/'
@@ -264,17 +264,16 @@ dg_raw['mean'] = dg_raw.mean(axis=1)
 
 for i in range(n):
 
-    t_monthly = dg_raw.index
-    raw_ts_monthly = dg_raw.iloc[:,i]
-    pha_ts_monthly = dg_pha.iloc[:,i]
+    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12).mean()
+    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12).mean()
 
     figstr = stationcodes[i] + '-raw-v-pha.png'
-    titlestr = stationcodes[i]
+    titlestr = stationcodes[i] + ': 12-month rolling means'
                  
     fig, ax = plt.subplots(figsize=(15,10))          
-    plt.scatter(t_monthly, raw_ts_monthly, marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
-    plt.scatter(t_monthly, pha_ts_monthly, marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
-    plt.vlines(t_monthly, raw_ts_monthly, pha_ts_monthly, colors='lightgrey', zorder=0)
+    plt.scatter(raw_ts_yearly.index, raw_ts_yearly, marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
+    plt.scatter(pha_ts_yearly.index, pha_ts_yearly, marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
+    plt.vlines(raw_ts_yearly.index, raw_ts_yearly, pha_ts_yearly, colors='lightgrey', zorder=0)
     ax.xaxis.grid(True, which='major')      
     ax.yaxis.grid(True, which='major')  
     plt.tick_params(labelsize=16)    
@@ -292,13 +291,16 @@ for i in range(n):
 # PLOT: raw (mean) v adjusted (mean)
 #------------------------------------------------------------------------------
 
+mean_raw_ts_yearly = dg_raw['mean'].rolling(12).mean()
+mean_pha_ts_yearly = dg_pha['mean'].rolling(12).mean()
+
 figstr = 'raw-v-pha-means.png'
-titlestr = 'Monthly means: raw versus PHA-adjusted'
+titlestr = 'Mean raw versus mean PHA-adjusted: 12-month rolling means'
                  
 fig, ax = plt.subplots(figsize=(15,10))          
-plt.scatter(t_monthly, dg_raw['mean'], marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
-plt.scatter(t_monthly, dg_pha['mean'], marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
-plt.vlines(t_monthly, dg_raw['mean'], dg_pha['mean'], colors='lightgrey', zorder=0)
+plt.scatter(mean_raw_ts_yearly.index, mean_raw_ts_yearly, marker='s', facecolor='white', color='blue', alpha=1.0, zorder=1, label='raw')
+plt.scatter(mean_pha_ts_yearly.index, mean_pha_ts_yearly, marker='.', color='red', alpha=1.0, zorder=2, label='PHA-adjusted')
+plt.vlines(mean_raw_ts_yearly.index, mean_raw_ts_yearly, mean_pha_ts_yearly, colors='lightgrey', zorder=0)
 ax.xaxis.grid(True, which='major')      
 ax.yaxis.grid(True, which='major')  
 plt.tick_params(labelsize=16)    
@@ -317,10 +319,10 @@ plt.close(fig)
 #------------------------------------------------------------------------------
 
 figstr = 'raw-v-pha-means-diff.png'
-titlestr = 'Monthly mean adjustments (raw-PHA)'
+titlestr = 'Mean adjustments (raw-PHA): 12-month rolling means'
                  
 fig, ax = plt.subplots(figsize=(15,10))          
-plt.step(x=t_monthly, y=dg_raw['mean']-dg_pha['mean'], marker='.', color='black', lw=0.5, alpha=1.0, zorder=0)
+plt.step(x=mean_raw_ts_yearly.index, y=mean_raw_ts_yearly-mean_pha_ts_yearly, marker='.', color='black', lw=0.5, alpha=1.0, zorder=0)
 ax.xaxis.grid(True, which='major')      
 ax.yaxis.grid(True, which='major')  
 plt.tick_params(labelsize=16)    
@@ -339,10 +341,10 @@ plt.close(fig)
 
 adj_all = []
 for i in range(n):
-    raw_ts_monthly = dg_raw.iloc[:,i].ravel()
-    pha_ts_monthly = dg_pha.iloc[:,i].ravel()
-    adj_ts_monthly = raw_ts_monthly-pha_ts_monthly
-    adj_all.append(adj_ts_monthly)    
+    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12).mean()
+    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12).mean()
+    adj_ts_yearly = raw_ts_yearly-pha_ts_yearly
+    adj_all.append(adj_ts_yearly)    
 adj_all = np.array(adj_all).flatten()
 mask = (np.isfinite(adj_all)) & (np.abs(adj_all)>0.001)
 adjustments = adj_all[mask]
@@ -350,7 +352,7 @@ adjustments = adj_all[mask]
 bins = 41
 xmin = -1.0; xmax = 1.0
 figstr = 'adjustment-histogram.png'
-titlestr = 'Histogram of all monthly adjustments (raw-PHA)'
+titlestr = 'Histogram of all adjustments (raw-PHA): 12-month rolling means'
                  
 fig, ax = plt.subplots(figsize=(15,10))     
 kde = stats.gaussian_kde(adjustments); x = np.linspace(xmin,xmax,1000)
@@ -366,7 +368,7 @@ ax1.set_ylabel('Count', fontsize=fontsize)
 ax1.set_xlim(xmin,xmax)
 ax1.xaxis.grid(True, which='major')      
 ax1.tick_params(labelsize=16)    
-ax2.set_ylabel('KDE', fontsize=fontsize, color='red')
+ax2.set_ylabel('Kernel density estimate (KDE)', fontsize=fontsize, color='red')
 ax2.tick_params(labelsize=16, colors='red')    
 ax2.spines['right'].set_color('red')
 plt.title(titlestr, fontsize=fontsize)
