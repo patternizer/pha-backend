@@ -64,12 +64,10 @@ pha_endyear = 2015
 flag_absolute = True
 
 dir_cwd = '/home/patternizer/Documents/REPOS/pha-backend/'
-dir_raw = 'ICELAND/data/benchmark/world1/monthly/raw/'
-#dir_pha = 'ICELAND/data/benchmark/world1/monthly/FLs.r00/'
-dir_pha = 'ICELAND/data/benchmark/world1/monthly/WMs.r00/'
-dir_stnlist = 'ICELAND/data/benchmark/world1/meta/world1_stnlist.tavg'
+dir_raw = 'ICELAND/trausti-raw-normals/data/benchmark/world1/monthly/raw/'
+dir_pha = 'ICELAND/trausti-raw-normals/data/benchmark/world1/monthly/WMs.r00/'
+dir_stnlist = 'ICELAND/trausti-raw-normals/data/benchmark/world1/meta/world1_stnlist.tavg'
 raw_files = sorted(glob.glob(dir_cwd+dir_raw+'*.raw.tavg'))
-#pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.FLs.r00.tavg'))
 pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.WMs.r00.tavg'))
 stnlist = glob.glob(dir_cwd+dir_stnlist)[0]
 
