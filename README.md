@@ -1,16 +1,17 @@
-![image](https://github.com/patternizer/pha-backend/blob/master/PLOTS/adjustments-absolute/trausti-raw-normals/yearly/raw-v-pha-means.png)
+![image](https://github.com/patternizer/pha-backend/blob/master/australia-adjusted-raw-v-pha-temporal-coverage.png)
+![image](https://github.com/patternizer/pha-backend/blob/master/australia-adjusted-adjustment-histogram.png)
 
 # pha-backend
 
-Python back-end for data handling, analysis and plotting of output from NOAA's PHA v52i algorithm for pairwise homogenisation of land surface air temperature monitoring station subsets from CRUTEM5 in the [GloSAT](https://www.glosat.org) project
+Python back-end for data handling, analysis and plotting of output from NOAA's PHA v52i algorithm for pairwise homogenisation algorithm (PHA) adjustment of land surface air temperature monitoring station observations. Ongoing work for the [GloSAT](https://www.glosat.org) project
 
 * python output file data handling code
 
 ## Contents
 
-* `pha-backend.py` - python code to generate station homogenisation dataframes
+* `pha-backend.py` - python code to generate station homogenisation timeseries dataframes for raw and adjusted station observations supplied in GHCNm-v4 format.
 
-Plus plots of invidual raw versus PHA adjusted absolute temperatures and anomalies (from 1961-1990), subset means, differences and a histogram of adjustments.
+In addition, the code plots the archive temporal coverage ranked by station, mean raw versus PHA-adjusted absolute temperature timeseries and their differences as well as a histogram of adjustments.
 
 The first step is to clone the latest pha-backend code and step into the check out directory: 
 
@@ -34,4 +35,5 @@ The code is distributed under terms and conditions of the [Open Government Licen
 ## Contact information
 
 * [Michael Taylor](michael.a.taylor@uea.ac.uk)
+
 
