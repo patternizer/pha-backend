@@ -4,7 +4,7 @@
 #------------------------------------------------------------------------------
 # PROGRAM: pha-backend.py
 #------------------------------------------------------------------------------
-# Version 0.4
+# Version 0.5
 # 25 May February, 2021
 # Michael Taylor
 # https://patternizer.github.io
@@ -70,13 +70,13 @@ dir_cwd = '/local/cqz20mbu/Documents/REPOS/pha-backend/'
 #dir_pha = 'ICELAND/trausti-raw-normals/data/benchmark/world1/monthly/WMs.r00/'
 #dir_stnlist = 'ICELAND/trausti-raw-normals/data/benchmark/world1/meta/world1_stnlist.tavg'
 
-#dir_raw = 'AUSTRALIA/Adjusted/world1/monthly/raw/'
-#dir_pha = 'AUSTRALIA/Adjusted/world1/monthly/FLs.r00/'
-#dir_stnlist = 'AUSTRALIA/Adjusted/world1/meta/world1_stnlist.tavg'
+dir_raw = 'AUSTRALIA/Adjusted/world1/monthly/raw/'
+dir_pha = 'AUSTRALIA/Adjusted/world1/monthly/FLs.r00/'
+dir_stnlist = 'AUSTRALIA/Adjusted/world1/meta/world1_stnlist.tavg'
 
-dir_raw = 'AUSTRALIA/Unadjusted/world1/monthly/raw/'
-dir_pha = 'AUSTRALIA/Unadjusted/world1/monthly/FLs.r00/'
-dir_stnlist = 'AUSTRALIA/Unadjusted/world1/meta/world1_stnlist.tavg'
+#dir_raw = 'AUSTRALIA/Unadjusted/world1/monthly/raw/'
+#dir_pha = 'AUSTRALIA/Unadjusted/world1/monthly/FLs.r00/'
+#dir_stnlist = 'AUSTRALIA/Unadjusted/world1/meta/world1_stnlist.tavg'
 
 raw_files = sorted(glob.glob(dir_cwd+dir_raw+'*.raw.tavg'))
 pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.FLs.r00.tavg'))
@@ -157,20 +157,27 @@ for k in range(n):
 
     df_raw = df_raw.copy().append([df],ignore_index=True)
 
-# EXTRACT: timeseries and store in dataframe --> dg_raw
+# EXTRACT: timeseries, fill in missing years and store in dataframe --> dg_raw
 
 t = pd.date_range(start=str(df_raw.min().year), end=str(df_raw.max().year+1), freq='M')
-dg_raw = pd.DataFrame( columns=df_raw['stationcode'].unique(), index=t)   
-
+dg_raw = pd.DataFrame( columns=df_raw['stationcode'].unique(), index=t)       
 for i in range(n):
-
     da = df_raw[df_raw['stationcode']==df_raw['stationcode'].unique()[i]].iloc[:,1:]
-    ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
+    ts_monthly = []
+    k = 0
+    for j in range(da['year'].iloc[0], da['year'].iloc[-1]+1):
+        if da['year'].iloc[k] == j:
+            ts_monthly += list(da.iloc[k,1:])
+            k += 1
+        else:
+            ts_monthly += list(12*[np.nan])    
+#   ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
     t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')       
     db = pd.DataFrame(ts_monthly,index=t_monthly)
     dg_raw[dg_raw.columns[i]] = db
 
-    print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
+#    if (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) > 0) | (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) < 0):
+#        print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
 
 dg_raw['mean'] = dg_raw.mean(axis=1)
 
@@ -236,29 +243,43 @@ for k in range(n):
 
     df_pha = df_pha.copy().append([df],ignore_index=True)
     
-# EXTRACT: timeseries and store in dataframe --> dg_raw
+# EXTRACT: timeseries, fill in missing years and store in dataframe --> dg_raw
 
 t = pd.date_range(start=str(df_pha.min().year), end=str(df_pha.max().year+1), freq='M')
 dg_pha = pd.DataFrame( columns=df_pha['stationcode'].unique(), index=t)   
-
 for i in range(n):
-
     da = df_pha[df_pha['stationcode']==df_pha['stationcode'].unique()[i]].iloc[:,1:]
-    ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
+    ts_monthly = []
+    k = 0
+    for j in range(da['year'].iloc[0], da['year'].iloc[-1]+1):
+        if da['year'].iloc[k] == j:
+            ts_monthly += list(da.iloc[k,1:])
+            k += 1
+        else:
+            ts_monthly += list(12*[np.nan])
+#   ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
     t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')       
     db = pd.DataFrame(ts_monthly,index=t_monthly)
     dg_pha[dg_pha.columns[i]] = db
 
-    print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
+#    if (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) > 0) | (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) < 0):        
+#        print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
 
 dg_pha['mean'] = dg_pha.mean(axis=1)
+
+#------------------------------------------------------------------------------
+# PLOTS
+#------------------------------------------------------------------------------
+
 
 #------------------------------------------------------------------------------
 # PLOT: raw (mean) v adjusted (mean)
 #------------------------------------------------------------------------------
 
-mean_raw = dg_raw['mean'].rolling(12).mean()
-mean_pha = dg_pha['mean'].rolling(12).mean()
+print('plotting mean raw versus PHA-adjusted ...')
+
+mean_raw = dg_raw['mean'].rolling(12, center=True).mean()
+mean_pha = dg_pha['mean'].rolling(12, center=True).mean()
 #mean_raw = dg_raw['mean']
 #mean_pha = dg_pha['mean']
 diff_raw_pha = mean_raw - mean_pha
@@ -286,8 +307,10 @@ plt.savefig(figstr, dpi=300)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# PLOT: raw data temporal coverage 
+# PLOT: raw and PHA-adjusted temporal coverage 
 #------------------------------------------------------------------------------
+
+print('plotting raw and PHA-adjusted temporal coverage ...')
 
 raw_min = df_raw.groupby('stationcode').min()['year']
 raw_max = df_raw.groupby('stationcode').max()['year']
@@ -319,6 +342,8 @@ plt.close(fig)
 # PLOT: raw (mean) - adjusted (mean)
 #------------------------------------------------------------------------------
 
+print('plotting difference of mean raw minus mean PHA-adjusted ...')
+
 figstr = 'raw-v-pha-means-diff.png'
 titlestr = 'Australia (unadjusted): mean raw-PHA adjustments (1300 stations)'
                  
@@ -339,6 +364,8 @@ plt.close(fig)
 #------------------------------------------------------------------------------
 # PLOT: histogram of adjustments
 #------------------------------------------------------------------------------
+
+print('plotting (missing middle) histogram of raw minus PHA-adjusted differences ...')
     
 adj_all = []
 for i in range(n):
@@ -386,14 +413,17 @@ plt.savefig(figstr, dpi=300)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# PLOT: raw v adjusted per sration
+# PLOT: raw versus PHA-adjusted per station
 #------------------------------------------------------------------------------
 
-draws = random.sample(range(n), 10)
+print('plotting random seletion of station raw versus PHA-adjusted ...')
+
+nstations = 10
+draws = random.sample(range(n), nstations)
 for i in draws:
 
-    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12).mean()
-    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12).mean()
+    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12, center=True).mean()
+    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12, center=True).mean()
     raw_ts = dg_raw.iloc[:,i]
     pha_ts = dg_pha.iloc[:,i]
     mask = np.isfinite(raw_ts_yearly - pha_ts_yearly) 
