@@ -4,8 +4,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: pha-backend.py
 #------------------------------------------------------------------------------
-# Version 0.5
-# 25 May February, 2021
+# Version 0.6
+# 20 May, 2022
 # Michael Taylor
 # https://patternizer.github.io
 # patternizer AT gmail DOT com
@@ -22,21 +22,7 @@ import pickle
 from datetime import datetime
 #import nc_time_axis
 #import cftime
-import scipy
-import scipy.stats as stats    
-from sklearn.preprocessing import StandardScaler
-# Plotting libraries:
-import matplotlib
-import matplotlib.pyplot as plt; plt.close('all')
-import matplotlib.cm as cm
-import cmocean
-from matplotlib import colors as mcol
-from matplotlib.cm import ScalarMappable
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
-import matplotlib.dates as mdates
-import matplotlib.colors as mcolors
-import matplotlib.ticker as mticker
+
 # OS libraries:
 import os, glob
 import os.path
@@ -45,8 +31,28 @@ import sys
 import subprocess
 from subprocess import Popen
 import time
+
 # Math libraries
 import random
+
+# Stats libraries:
+import scipy
+import scipy.stats as stats    
+from sklearn.preprocessing import StandardScaler
+
+# Plotting libraries:
+import matplotlib
+import matplotlib.pyplot as plt; plt.close('all')
+import seaborn as sns; sns.set()
+#import matplotlib.cm as cm
+#import cmocean
+#from matplotlib import colors as mcol
+#from matplotlib.cm import ScalarMappable
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+#import matplotlib.dates as mdates
+#import matplotlib.colors as mcolors
+#import matplotlib.ticker as mticker
 
 # Silence library version notifications
 import warnings
@@ -61,25 +67,23 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 #------------------------------------------------------------------------------
 
 fontsize = 20
-nheader = 0
 flag_absolute = True
+flag_comparison_draws = True
 
 dir_cwd = '/local/cqz20mbu/Documents/REPOS/pha-backend/'
-#dir_cwd = '~/Documents/REPOS/pha-backend/'
-#dir_raw = 'ICELAND/trausti-raw-normals/data/benchmark/world1/monthly/raw/'
-#dir_pha = 'ICELAND/trausti-raw-normals/data/benchmark/world1/monthly/WMs.r00/'
-#dir_stnlist = 'ICELAND/trausti-raw-normals/data/benchmark/world1/meta/world1_stnlist.tavg'
 
-dir_raw = 'AUSTRALIA/Adjusted/world1/monthly/raw/'
-dir_pha = 'AUSTRALIA/Adjusted/world1/monthly/FLs.r00/'
-dir_stnlist = 'AUSTRALIA/Adjusted/world1/meta/world1_stnlist.tavg'
+#region = 'ICELAND'
+#region = 'AUSTRALIA'
+region = 'NORWAY'
 
-#dir_raw = 'AUSTRALIA/Unadjusted/world1/monthly/raw/'
-#dir_pha = 'AUSTRALIA/Unadjusted/world1/monthly/FLs.r00/'
-#dir_stnlist = 'AUSTRALIA/Unadjusted/world1/meta/world1_stnlist.tavg'
+dir_raw = region + '/Adjusted/world1/monthly/raw/'
+dir_pha = region + '/Adjusted/world1/monthly/FLs.r00/'
+#dir_pha = region + '/Adjusted/world1/monthly/WMs.r00/'
+dir_stnlist = region + '/Adjusted/world1/meta/world1_stnlist.tavg'
 
 raw_files = sorted(glob.glob(dir_cwd+dir_raw+'*.raw.tavg'))
 pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.FLs.r00.tavg'))
+#pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.WMs.r00.tavg'))
 stnlist = glob.glob(dir_cwd+dir_stnlist)[0]
 
 #------------------------------------------------------------------------------
@@ -89,26 +93,26 @@ stnlist = glob.glob(dir_cwd+dir_stnlist)[0]
 f = open(stnlist)
 lines = f.readlines()
 stationcodes = []
-for i in range(nheader,len(lines)):
+for i in range( len(lines) ):
     words = lines[i].split()    
     stationcode = words[0]
     stationcodes.append(stationcode)        
 f.close()    
 
-n = len(stationcodes)
-
 #------------------------------------------------------------------------------
 # LOAD: raw station absolute temperatures (Tx100) in GHCNm-v3 format --> df_raw
 #------------------------------------------------------------------------------
 
+print('loading raw files ...')
+
 df_raw = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
-for k in range(n):
+for k in range( len(raw_files) ):
 
     f = open(raw_files[k])
     lines = f.readlines()
     dates = []
     obs = []
-    for i in range(nheader,len(lines)):
+    for i in range( len(lines) ):
         words = lines[i].split()    
         date = int(words[1])
         val = (12)*[None]
@@ -122,15 +126,17 @@ for k in range(n):
     dates = np.array(dates)
     obs = np.array(obs)
 
+    stationcodes_raw_files = [ raw_files[i][-15:-9] for i in range(len(raw_files)) ]
+
     # Check for empty station file
 
-    if len(dates) == 0: print(stationcodes[k])
+    if len(dates) == 0: print('EMPTY:', stationcodes_raw_files[k])
 
     # Create station dataframe
 
     df = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
     df['year'] = dates
-    df['stationcode'] = len(dates)*[stationcodes[k]]
+    df['stationcode'] = len(dates)*[stationcodes_raw_files[k]]
 
     # Store monthly values
        
@@ -159,9 +165,9 @@ for k in range(n):
 
 # EXTRACT: timeseries, fill in missing years and store in dataframe --> dg_raw
 
-t = pd.date_range(start=str(df_raw.min().year), end=str(df_raw.max().year+1), freq='M')
+t = pd.date_range(start=str(df_raw.min().year), end=str(df_raw.max().year+1), freq='MS')[0:-1]
 dg_raw = pd.DataFrame( columns=df_raw['stationcode'].unique(), index=t)       
-for i in range(n):
+for i in range( len(df_raw.stationcode.unique()) ):
     da = df_raw[df_raw['stationcode']==df_raw['stationcode'].unique()[i]].iloc[:,1:]
     ts_monthly = []
     k = 0
@@ -171,28 +177,27 @@ for i in range(n):
             k += 1
         else:
             ts_monthly += list(12*[np.nan])    
-#   ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
-    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')       
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='MS')       
     db = pd.DataFrame(ts_monthly,index=t_monthly)
     dg_raw[dg_raw.columns[i]] = db
 
-#    if (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) > 0) | (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) < 0):
-#        print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
-
-dg_raw['mean'] = dg_raw.mean(axis=1)
+dg_raw['mean'] = np.nanmean( dg_raw, axis=1)
+n_raw = df_raw.stationcode.unique().shape[0]
 
 #------------------------------------------------------------------------------
 # LOAD: PHA station adjusted absolute temperatures (Tx100) in GHCNm-v3 format --> df_pha
 #------------------------------------------------------------------------------
 
-df_pha = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
-for k in range(n): 
+print('loading PHA files ...')
 
+df_pha = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
+for k in range( len(pha_files) ): 
+    
     f = open(pha_files[k])
     lines = f.readlines()
     dates = []
     obs = []
-    for i in range(nheader,len(lines)):
+    for i in range( len(lines) ):
         words = lines[i].split()    
         date = int(words[0][-4:])
         val = (12)*[None]
@@ -206,16 +211,17 @@ for k in range(n):
     dates = np.array(dates)
     obs = np.array(obs)
 
+    stationcodes_pha_files = [ pha_files[i][-19:-13] for i in range(len(pha_files)) ]
+
     # Check for empty station file
 
-    if len(dates) == 0: print(stationcodes[k])
-#   if len(dates) == 0: continue
+    if len(dates) == 0: print('EMPTY:', stationcodes_pha_files[k])
 
     # Create station dataframe: NB: stations with no data drop out
 
     df = pd.DataFrame(columns=['stationcode','year','1','2','3','4','5','6','7','8','9','10','11','12'])
     df['year'] = dates
-    df['stationcode'] = len(dates)*[stationcodes[k]]
+    df['stationcode'] = len(dates)*[stationcodes_pha_files[k]]
     
     # Store monthly values
     
@@ -245,9 +251,9 @@ for k in range(n):
     
 # EXTRACT: timeseries, fill in missing years and store in dataframe --> dg_raw
 
-t = pd.date_range(start=str(df_pha.min().year), end=str(df_pha.max().year+1), freq='M')
+t = pd.date_range(start=str(df_pha.min().year), end=str(df_pha.max().year+1), freq='MS')[0:-1]
 dg_pha = pd.DataFrame( columns=df_pha['stationcode'].unique(), index=t)   
-for i in range(n):
+for i in range( len(df_pha.stationcode.unique()) ):
     da = df_pha[df_pha['stationcode']==df_pha['stationcode'].unique()[i]].iloc[:,1:]
     ts_monthly = []
     k = 0
@@ -257,42 +263,47 @@ for i in range(n):
             k += 1
         else:
             ts_monthly += list(12*[np.nan])
-#   ts_monthly = np.array(da.groupby('year').mean().iloc[:,0:]).ravel() 
-    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')       
-    db = pd.DataFrame(ts_monthly,index=t_monthly)
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='MS')       
+    db = pd.DataFrame(ts_monthly,index=t_monthly)            
     dg_pha[dg_pha.columns[i]] = db
 
-#    if (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) > 0) | (len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1) < 0):        
-#        print(i, len(da)-(da.year.iloc[-1]-da.year.iloc[0]+1))
-
 dg_pha['mean'] = dg_pha.mean(axis=1)
+n_pha = df_pha.stationcode.unique().shape[0]
 
-#------------------------------------------------------------------------------
+#==============================================================================
+# STATS
+#==============================================================================
+
+mean_raw = dg_raw['mean'].rolling(12, center=True).mean() 
+mean_pha = dg_pha['mean'].rolling(12, center=True).mean() 
+mean_diff = np.subtract( dg_raw['mean'], dg_pha['mean'] )
+
+min_raw = df_raw.groupby('stationcode').min()['year']
+max_raw = df_raw.groupby('stationcode').max()['year']
+min_pha = df_pha.groupby('stationcode').min()['year']
+max_pha = df_pha.groupby('stationcode').max()['year']
+da = pd.DataFrame( {'min_raw':min_raw, 'max_raw':max_raw}, index=min_raw.index ) 
+db = pd.DataFrame( {'min_pha':min_pha, 'max_pha':max_pha}, index=min_pha.index ) 
+dc = da.merge( db, how='left', on='stationcode')
+
+#==============================================================================
 # PLOTS
+#==============================================================================
+
+#------------------------------------------------------------------------------
+# PLOT: raw (mean) v PHA (mean) + station running averages
 #------------------------------------------------------------------------------
 
-
-#------------------------------------------------------------------------------
-# PLOT: raw (mean) v adjusted (mean)
-#------------------------------------------------------------------------------
-
-print('plotting mean raw versus PHA-adjusted ...')
-
-mean_raw = dg_raw['mean'].rolling(12, center=True).mean()
-mean_pha = dg_pha['mean'].rolling(12, center=True).mean()
-#mean_raw = dg_raw['mean']
-#mean_pha = dg_pha['mean']
-diff_raw_pha = mean_raw - mean_pha
-mask = np.isfinite(diff_raw_pha) 
+print('plotting mean raw versus PHA ...')
 
 figstr = 'raw-v-pha-means.png'
-titlestr = 'Australia (unadjusted): mean raw versus PHA (1300 stations)'
+titlestr = region.title() + ': raw versus PHA (' + str( n_pha ) + ' stations)'
                  
 fig, ax = plt.subplots(figsize=(15,10))          
-plt.plot(mean_raw.index, mean_raw, marker='.', markersize=10, color='blue', alpha=0.5, ls='-', lw=1.0, zorder=1, label='raw: 12m MA')
-plt.plot(mean_pha.index, mean_pha, marker='.', markersize=10, color='red', alpha=0.5, ls='-', lw=1.0, zorder=2, label='PHA: 12m MA')
-#plt.vlines(mean_raw.index, mean_raw, mean_pha, colors='lightgrey', zorder=0)
-#plt.vlines(mean_raw.index[mask], mean_raw[mask], mean_pha[mask], colors='lightgrey', zorder=0)
+plt.plot(dg_raw.index, dg_raw.rolling(12).mean(), '.', alpha=0.05) 
+#plt.plot(dg_pha.index, dg_pha.rolling(12).mean(), '.', alpha=0.05)
+plt.plot(dg_raw.index, dg_raw['mean'].rolling(24).mean(), marker='o', markersize=1, color='blue', alpha=0.5, ls='-', lw=3, label='raw mean (12m MA)' )
+plt.plot(dg_pha.index, dg_pha['mean'].rolling(24).mean(), marker='o', markersize=1, color='red', alpha=0.5, ls='-', lw=3, label='PHA mean (12m MA)' )
 ax.xaxis.grid(True, which='major')      
 ax.yaxis.grid(True, which='major')  
 plt.tick_params(labelsize=fontsize)    
@@ -307,48 +318,16 @@ plt.savefig(figstr, dpi=300)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# PLOT: raw and PHA-adjusted temporal coverage 
+# PLOT: raw (mean) - PHA (mean)
 #------------------------------------------------------------------------------
 
-print('plotting raw and PHA-adjusted temporal coverage ...')
-
-raw_min = df_raw.groupby('stationcode').min()['year']
-raw_max = df_raw.groupby('stationcode').max()['year']
-pha_min = df_pha.groupby('stationcode').min()['year']
-pha_max = df_pha.groupby('stationcode').max()['year']
-
-figstr = 'raw-v-pha-temporal-coverage.png'
-titlestr = 'Australia (unadjusted): temporal coverage (1300 stations)'
-                 
-fig, ax = plt.subplots(figsize=(15,10))          
-plt.step(np.arange(len(raw_min)), raw_min, color='blue', alpha=1.0, label='raw')
-plt.step(np.arange(len(raw_max)), raw_max, color='blue', alpha=0.5)
-plt.vlines(np.arange(len(raw_min)), raw_min, raw_max, color='blue', alpha=0.1)
-plt.step(np.arange(len(pha_min)), pha_min, color='red', alpha=1.0, label='PHA-adjusted')
-plt.step(np.arange(len(pha_max)), pha_max, color='red', alpha=0.5)
-plt.vlines(np.arange(len(pha_min)), pha_min, pha_max, color='red', alpha=0.1)
-ax.set_ylim(1825,2025)
-ax.xaxis.grid(True, which='major')      
-ax.yaxis.grid(True, which='major')  
-plt.tick_params(labelsize=fontsize)    
-plt.legend(loc='lower right', fontsize=fontsize)
-plt.ylabel(r'Year', fontsize=fontsize)
-plt.xlabel(r'Station rank by coverage', fontsize=fontsize)
-plt.title(titlestr, fontsize=fontsize)
-plt.savefig(figstr, dpi=300)
-plt.close(fig)
-
-#------------------------------------------------------------------------------
-# PLOT: raw (mean) - adjusted (mean)
-#------------------------------------------------------------------------------
-
-print('plotting difference of mean raw minus mean PHA-adjusted ...')
+print('plotting difference of mean raw - mean PHA ...')
 
 figstr = 'raw-v-pha-means-diff.png'
-titlestr = 'Australia (unadjusted): mean raw-PHA adjustments (1300 stations)'
+titlestr = region.title() + ': raw-PHA mean (' + str(n_pha) + ' stations)'
                  
 fig, ax = plt.subplots(figsize=(15,10))          
-plt.plot(mean_raw.index[mask], diff_raw_pha[mask], '.', markersize=10, color='black', alpha=0.5, ls='-', lw=1.0)
+plt.plot(mean_diff.index, mean_diff, '.', markersize=10, color='black', alpha=0.5, ls='-', lw=1.0)
 ax.xaxis.grid(True, which='major')      
 ax.yaxis.grid(True, which='major')  
 plt.tick_params(labelsize=fontsize)    
@@ -362,95 +341,112 @@ plt.savefig(figstr, dpi=300)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# PLOT: histogram of adjustments
+# PLOT: raw and PHA temporal coverage 
 #------------------------------------------------------------------------------
 
-print('plotting (missing middle) histogram of raw minus PHA-adjusted differences ...')
-    
-adj_all = []
-for i in range(n):
-#    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12).mean()
-#    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12).mean()
-    raw_ts_yearly = dg_raw.iloc[:,i]
-    pha_ts_yearly = dg_pha.iloc[:,i]
-    adj_ts_yearly = raw_ts_yearly-pha_ts_yearly
-    adj_all.append(adj_ts_yearly)    
-adj_all = np.array(adj_all).flatten()
-mask = (np.isfinite(adj_all)) & (np.abs(adj_all)>0.0)
-adjustments = adj_all[mask]
+print('plotting raw and PHA temporal coverage ...')
 
-xmin = -6.0; xmax = 6.0
-#bins = int((xmax-xmin)*10+1)
-bins = 301
-x = np.linspace(xmin,xmax,301)
-
-figstr = 'adjustment-histogram.png'
-titlestr = 'Australia (unadjusted): histogram of raw-PHA adjustments (1300 stations)'
+figstr = 'raw-v-pha-temporal-coverage.png'
+titlestr = region.title() + ': temporal coverage (' + str(n_pha) + ' stations)'
                  
-fig, ax = plt.subplots(figsize=(15,10))     
-kde = stats.gaussian_kde(adjustments, bw_method='silverman'); 
-plt.hist(adjustments, density=False, bins=bins, alpha=1.0, color='lightgrey', label='bin counts')
-ax1 = plt.gca()
-ymin,ymax = ax1.get_ylim()
-#plt.plot(x, kde(x)*ymax, color='red', lw=3, label='Kernel density estimate (KDE)')
-#ax2 = ax.twinx()
-#ax2.plot(x, kde(x), color='red', lw=3)
-if flag_absolute == True:
-    ax1.set_xlabel(r'Absolute temperature adjustment [°C]', fontsize=fontsize)
-else:
-    ax1.set_xlabel(r'Temperature anomaly (from 1961-1990) adjustment [°C]', fontsize=fontsize)
-ax1.set_ylabel('Count', fontsize=fontsize)
-ax1.set_xlim(xmin,xmax)
-ax1.set_ylim(ymin,ymax)
-ax1.xaxis.grid(True, which='major')      
-ax1.tick_params(labelsize=fontsize)    
-#ax2.set_ylabel('Kernel density estimate (KDE)', fontsize=fontsize, color='red')
-#ax2.tick_params(labelsize=16, colors='red')    
-#ax2.spines['right'].set_color('red')
-plt.legend(loc='upper right', fontsize=fontsize)
+fig, ax = plt.subplots(figsize=(15,10))          
+plt.fill_between(np.arange(len(dc)), dc.min_raw, dc.max_raw, step='pre', color='blue', alpha=0.2, label='raw')
+plt.fill_between(np.arange(len(dc)), dc.min_pha, dc.max_pha, step='pre', color='red', alpha=0.2, label='PHA')
+ax.xaxis.grid(True, which='major')      
+ax.yaxis.grid(True, which='major')  
+plt.tick_params(labelsize=fontsize)    
+plt.legend(loc='lower right', fontsize=fontsize)
+plt.ylabel(r'Year', fontsize=fontsize)
+plt.xlabel(r'Station rank by coverage', fontsize=fontsize)
 plt.title(titlestr, fontsize=fontsize)
 plt.savefig(figstr, dpi=300)
 plt.close(fig)
 
 #------------------------------------------------------------------------------
-# PLOT: raw versus PHA-adjusted per station
+# PLOT: histogram of adjustments
 #------------------------------------------------------------------------------
 
-print('plotting random seletion of station raw versus PHA-adjusted ...')
-
-nstations = 10
-draws = random.sample(range(n), nstations)
-for i in draws:
-
-    raw_ts_yearly = dg_raw.iloc[:,i].rolling(12, center=True).mean()
-    pha_ts_yearly = dg_pha.iloc[:,i].rolling(12, center=True).mean()
-    raw_ts = dg_raw.iloc[:,i]
-    pha_ts = dg_pha.iloc[:,i]
-    mask = np.isfinite(raw_ts_yearly - pha_ts_yearly) 
+print('plotting ("missing middle") histogram of raw minus PHA differences ...')
     
-    ds = pd.DataFrame({'raw':raw_ts_yearly, 'pha':pha_ts_yearly})
+adj_all = []
+for i in range( n_pha ):
     
-    figstr = stationcodes[i] + '-raw-v-pha.png'
-    titlestr = stationcodes[i] + ': raw versus PHA'
+    stationcode = dg_pha.columns[i]  
+    adj_ts_yearly = np.subtract( dg_raw[stationcode], dg_pha[stationcode] )
+    adj_all.append(adj_ts_yearly)    
+
+adj_all = np.array(adj_all).flatten()
+mask = (np.isfinite(adj_all)) & (np.abs(adj_all)>0.0)
+#mask = np.isfinite(adj_all)
+adjustments = adj_all[mask]
+
+xmin = -2.0; xmax = 2.0
+#bins = int((xmax-xmin)*10+1)
+bins = 201
+x = np.linspace( xmin, xmax, bins)
+
+figstr = 'adjustment-histogram.png'
+titlestr = region.title() + ': histogram of raw-PHA adjustments (' + str( n_pha ) + ' stations)'
                  
-    fig, ax = plt.subplots(figsize=(15,10))          
-    plt.plot(raw_ts.index, raw_ts, marker='.', markersize=10, color='blue', alpha=0.1, ls='-', lw=1.0)
-    plt.plot(pha_ts.index, pha_ts, marker='.', markersize=10, color='red', alpha=0.1, ls='-', lw=1.0)
-    plt.plot(raw_ts_yearly.index, raw_ts_yearly, marker='.', markersize=10, color='blue', alpha=0.5, ls='-', lw=1.0, label='raw: 12m MA')    
-    plt.plot(pha_ts_yearly.index, pha_ts_yearly, marker='.', markersize=10, color='red', alpha=0.5, ls='-', lw=1.0, label='PHA: 12m MA')        
-#    plt.vlines(raw_ts_yearly.index[mask], raw_ts_yearly[mask], pha_ts_yearly[mask], colors='lightgrey', zorder=0)
-    ax.xaxis.grid(True, which='major')      
-    ax.yaxis.grid(True, which='major')  
-    plt.tick_params(labelsize=16)    
-    plt.legend(loc='upper left', fontsize=fontsize)
-    plt.xlabel('Year', fontsize=fontsize)
-    if flag_absolute == True:
-        plt.ylabel(r'Absolute temperature [°C]', fontsize=fontsize)
-    else:
-        plt.ylabel(r'Temperature anomaly (from 1961-1990) [°C]', fontsize=fontsize)
-    plt.title(titlestr, fontsize=fontsize)
-    plt.savefig(figstr, dpi=300)
-    plt.close(fig)
+fig, ax = plt.subplots(figsize=(15,10))     
+kde = stats.gaussian_kde( adjustments, bw_method='silverman' ) 
+h = plt.hist( adjustments, density=False, bins=bins, alpha=1.0, color='lightgrey', label='bin counts' )
+#ax1 = plt.gca(); ymin,ymax = ax1.get_ylim()
+ymax = h[0].max()
+plt.plot(x, kde(x)*ymax, color='red', lw=3, label='Kernel density estimate (KDE)')
+if flag_absolute == True:
+    ax.set_xlabel(r'Absolute temperature adjustment [°C]', fontsize=fontsize)
+else:
+    ax.set_xlabel(r'Temperature anomaly (from 1961-1990) adjustment [°C]', fontsize=fontsize)
+ax.set_ylabel('Count', fontsize=fontsize)
+ax.set_xlim(xmin,xmax)
+#ax1.set_ylim(ymin,ymax)
+ax.xaxis.grid(True, which='major')      
+ax.tick_params(labelsize=fontsize, colors='k')
+#ax.spines['left'].set_color('k')
+plt.legend(loc='upper left', fontsize=fontsize)
+plt.title(titlestr, fontsize=fontsize)
+plt.savefig(figstr, dpi=300)
+plt.close(fig)
+
+if flag_comparison_draws == True:
+    
+    #------------------------------------------------------------------------------
+    # PLOT: raw versus PHA-adjusted per station
+    #------------------------------------------------------------------------------
+    
+    print('plotting random seletion of station raw versus PHA ...')
+    
+    ndraws = 10
+    draws = random.sample( range( n_pha ), ndraws)
+    for i in draws:
+    
+        stationcode = dg_pha.columns[i]          
+        raw_ts_yearly = dg_raw[stationcode].rolling(12, center=True).mean()
+        pha_ts_yearly = dg_pha[stationcode].rolling(12, center=True).mean()
+        raw_ts = dg_raw[stationcode]
+        pha_ts = dg_pha[stationcode]
+        
+        figstr = stationcode + '-raw-v-pha.png'
+        titlestr = stationcode + ': raw versus PHA'
+                     
+        fig, ax = plt.subplots(figsize=(15,10))          
+        plt.plot(raw_ts.index, raw_ts, marker='.', markersize=10, color='blue', alpha=0.1, ls='-', lw=1.0)
+        plt.plot(pha_ts.index, pha_ts, marker='.', markersize=10, color='red', alpha=0.1, ls='-', lw=1.0)
+        plt.plot(raw_ts_yearly.index, raw_ts_yearly, marker='.', markersize=10, color='blue', alpha=0.5, ls='-', lw=1.0, label='raw: 12m MA')    
+        plt.plot(pha_ts_yearly.index, pha_ts_yearly, marker='.', markersize=10, color='red', alpha=0.5, ls='-', lw=1.0, label='PHA: 12m MA')        
+        ax.xaxis.grid(True, which='major')      
+        ax.yaxis.grid(True, which='major')  
+        plt.tick_params(labelsize=16)    
+        plt.legend(loc='upper left', fontsize=fontsize)
+        plt.xlabel('Year', fontsize=fontsize)
+        if flag_absolute == True:
+            plt.ylabel(r'Absolute temperature [°C]', fontsize=fontsize)
+        else:
+            plt.ylabel(r'Temperature anomaly (from 1961-1990) [°C]', fontsize=fontsize)
+        plt.title(titlestr, fontsize=fontsize)
+        plt.savefig(figstr, dpi=300)
+        plt.close(fig)
     
 #------------------------------------------------------------------------------
 print('** END')
