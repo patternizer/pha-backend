@@ -4,8 +4,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: pha-backend.py
 #------------------------------------------------------------------------------
-# Version 0.6
-# 20 May, 2022
+# Version 0.7
+# 5 December, 2022
 # Michael Taylor
 # https://patternizer.github.io
 # patternizer AT gmail DOT com
@@ -44,15 +44,8 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib
 import matplotlib.pyplot as plt; plt.close('all')
 import seaborn as sns; sns.set()
-#import matplotlib.cm as cm
-#import cmocean
-#from matplotlib import colors as mcol
-#from matplotlib.cm import ScalarMappable
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
-#import matplotlib.dates as mdates
-#import matplotlib.colors as mcolors
-#import matplotlib.ticker as mticker
 
 # Silence library version notifications
 import warnings
@@ -76,14 +69,12 @@ dir_cwd = '/local/cqz20mbu/Documents/REPOS/pha-backend/'
 #region = 'AUSTRALIA'
 region = 'NORWAY'
 
-dir_raw = region + '/Adjusted/world1/monthly/raw/'
-dir_pha = region + '/Adjusted/world1/monthly/FLs.r00/'
-#dir_pha = region + '/Adjusted/world1/monthly/WMs.r00/'
-dir_stnlist = region + '/Adjusted/world1/meta/world1_stnlist.tavg'
+dir_raw = 'DATA/' + region + '/Adjusted/world1/monthly/raw/'
+dir_pha = 'DATA/' + region + '/Adjusted/world1/monthly/FLs.r00/'
+dir_stnlist = 'DATA/' + region + '/Adjusted/world1/meta/world1_stnlist.tavg'
 
 raw_files = sorted(glob.glob(dir_cwd+dir_raw+'*.raw.tavg'))
 pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.FLs.r00.tavg'))
-#pha_files = sorted(glob.glob(dir_cwd+dir_pha+'*.WMs.r00.tavg'))
 stnlist = glob.glob(dir_cwd+dir_stnlist)[0]
 
 #------------------------------------------------------------------------------
