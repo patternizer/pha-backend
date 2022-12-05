@@ -20,9 +20,6 @@ import numpy as np
 import pandas as pd
 import pickle
 from datetime import datetime
-#import nc_time_axis
-#import cftime
-
 # OS libraries:
 import os, glob
 import os.path
@@ -31,22 +28,18 @@ import sys
 import subprocess
 from subprocess import Popen
 import time
-
 # Math libraries
 import random
-
 # Stats libraries:
 import scipy
 import scipy.stats as stats    
 from sklearn.preprocessing import StandardScaler
-
 # Plotting libraries:
 import matplotlib
 import matplotlib.pyplot as plt; plt.close('all')
 import seaborn as sns; sns.set()
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
-
 # Silence library version notifications
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -292,7 +285,6 @@ titlestr = region.title() + ': raw versus PHA (' + str( n_pha ) + ' stations)'
                  
 fig, ax = plt.subplots(figsize=(15,10))          
 plt.plot(dg_raw.index, dg_raw.rolling(12).mean(), '.', alpha=0.05) 
-#plt.plot(dg_pha.index, dg_pha.rolling(12).mean(), '.', alpha=0.05)
 plt.plot(dg_raw.index, dg_raw['mean'].rolling(24).mean(), marker='o', markersize=1, color='blue', alpha=0.5, ls='-', lw=3, label='raw mean (12m MA)' )
 plt.plot(dg_pha.index, dg_pha['mean'].rolling(24).mean(), marker='o', markersize=1, color='red', alpha=0.5, ls='-', lw=3, label='PHA mean (12m MA)' )
 ax.xaxis.grid(True, which='major')      
@@ -368,11 +360,9 @@ for i in range( n_pha ):
 
 adj_all = np.array(adj_all).flatten()
 mask = (np.isfinite(adj_all)) & (np.abs(adj_all)>0.0)
-#mask = np.isfinite(adj_all)
 adjustments = adj_all[mask]
 
 xmin = -2.0; xmax = 2.0
-#bins = int((xmax-xmin)*10+1)
 bins = 201
 x = np.linspace( xmin, xmax, bins)
 
@@ -382,7 +372,6 @@ titlestr = region.title() + ': histogram of raw-PHA adjustments (' + str( n_pha 
 fig, ax = plt.subplots(figsize=(15,10))     
 kde = stats.gaussian_kde( adjustments, bw_method='silverman' ) 
 h = plt.hist( adjustments, density=False, bins=bins, alpha=1.0, color='lightgrey', label='bin counts' )
-#ax1 = plt.gca(); ymin,ymax = ax1.get_ylim()
 ymax = h[0].max()
 plt.plot(x, kde(x)*ymax, color='red', lw=3, label='Kernel density estimate (KDE)')
 if flag_absolute == True:
@@ -391,10 +380,8 @@ else:
     ax.set_xlabel(r'Temperature anomaly (from 1961-1990) adjustment [°C]', fontsize=fontsize)
 ax.set_ylabel('Count', fontsize=fontsize)
 ax.set_xlim(xmin,xmax)
-#ax1.set_ylim(ymin,ymax)
 ax.xaxis.grid(True, which='major')      
 ax.tick_params(labelsize=fontsize, colors='k')
-#ax.spines['left'].set_color('k')
 plt.legend(loc='upper left', fontsize=fontsize)
 plt.title(titlestr, fontsize=fontsize)
 plt.savefig(figstr, dpi=300)
