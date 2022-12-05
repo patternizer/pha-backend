@@ -1,5 +1,5 @@
-![image](https://github.com/patternizer/pha-backend/blob/master/australia-adjusted-raw-v-pha-temporal-coverage.png)
-![image](https://github.com/patternizer/pha-backend/blob/master/australia-adjusted-adjustment-histogram.png)
+![image](https://github.com/patternizer/pha-backend/blob/main/australia-adjusted-raw-v-pha-temporal-coverage.png)
+![image](https://github.com/patternizer/pha-backend/blob/main/australia-adjusted-adjustment-histogram.png)
 
 # pha-backend
 
